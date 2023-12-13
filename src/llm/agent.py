@@ -1,10 +1,7 @@
 from functools import cache
-import os
-from openai import OpenAI, AzureOpenAI, AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI
 import base64
-from IPython.display import display, Markdown
-import json
-import time
+from loguru import logger
 
 from src.settings import Settings
 import src.llm.prompt as prompt
@@ -20,7 +17,9 @@ class CardAgent:
     async def create_card(self, image_path: str) -> str:
         image = self._encode_image(image_path)
         vision = await self._generate_vision(image)
+        logger.info(f"vision: {vision}")
         card = await self._generate_card(vision)
+        logger.info(f"card: {card}")
         card = self._postprocess(card)
         return card
 

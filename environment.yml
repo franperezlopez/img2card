@@ -11,8 +11,9 @@ dependencies:
   - fastapi
   - pydantic
   - pydantic-settings
-pip:
-  - loguru
-  - piexif
-  - python-telegram-bot
+  - pip
+  - pip:
+    - loguru
+    - piexif
+    - python-telegram-bot
 
