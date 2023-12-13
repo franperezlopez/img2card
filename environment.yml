@@ -1,0 +1,19 @@
+name: img2card
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - ipykernel
+  - python-dotenv
+  - openai
+  - tiktoken
+  - rich
+  - fastapi
+  - pydantic
+  - pydantic-settings
+  - pip
+  - pip:
+    - loguru
+    - piexif
+    - python-telegram-bot
+
