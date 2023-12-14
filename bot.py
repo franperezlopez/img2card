@@ -15,17 +15,18 @@ from src.llm.agent import make_agent
 from src.settings import get_settings
 
 
+
 settings = get_settings()
 
 async def call_agent(image_url):
-    logger.info("Processing image ...")
+    logger.info("Calling agent ...")
     agent = make_agent()
     event = await agent.create_card(image_url)
     logger.info(event)
     return event
 
 async def handle_image_compressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Handling image2 ...")
+    logger.info("Handling image compressed ...")
 
     photo = await context.bot.get_file(update.message.photo[-1])
     await _handle_image(update, context, photo)
@@ -104,8 +105,12 @@ def main():
 
     # Start the bot
     logger.info("Starting bot ...")
-    logger.info(settings.model_dump)
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info(settings.model_dump())
+    
+    # app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_webhook(listen="0.0.0.0", webhook_url=settings.TELEGRAM_WEBHOOK_URL, port=80,
+                    allowed_updates=Update.ALL_TYPES, secret_token=settings.TELEGRAM_SECRET, drop_pending_updates=True)
+
 
 if __name__ == '__main__':
     main()

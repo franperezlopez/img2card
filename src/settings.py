@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     LANGCHAIN_PROJECT: str = Field(default="img2card", env="LANGCHAIN_PROJECT")
 
     TELEGRAM_TOKEN: str = Field(env="TELEGRAM_TOKEN")
+    TELEGRAM_SECRET: Optional[str] = Field(default=None, env="TELEGRAM_SECRET")
+    TELEGRAM_WEBHOOK_URL: str = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
     TELEGRAM_DEV_CHAT_ID: Optional[Union[int, str]] = Field(default=None, env="TELEGRAM_DEV_CHAT_ID")
 
 

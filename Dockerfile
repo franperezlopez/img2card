@@ -1,12 +1,15 @@
 FROM python:3.10
 
+ENV CONDA_PATH="/opt/conda"
+ENV CONDA_ENV="img2card"
+
 # Install Miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda && \
+    bash Miniconda3-latest-Linux-x86_64.sh -b -p "${CONDA_PATH}" && \
     rm Miniconda3-latest-Linux-x86_64.sh
 
 # Set conda path
-ENV PATH="/opt/conda/bin:${PATH}"
+ENV PATH="${CONDA_PATH}/bin:${PATH}"
 
 ARG TELEGRAM_TOKEN
 ENV TELEGRAM_TOKEN=$TELEGRAM_TOKEN
@@ -17,13 +20,15 @@ ENV AZURE_OPENAI_API_BASE=$AZURE_OPENAI_API_BASE
 ARG LANGCHAIN_API_KEY
 ENV LANGCHAIN_API_KEY=$LANGCHAIN_API_KEY
 
+
 # Copy environment file
 COPY environment.yml .
 
 # Create conda environment
 RUN conda env create -f environment.yml && \
-    conda clean -afy
-# RUN conda clean -afy
+    conda clean -afy && \
+    rm environment.yml
+ENV PATH="${CONDA_PATH}/envs/${CONDA_ENV}/bin:${PATH}"
 
 # Set working directory
 WORKDIR /app
@@ -32,6 +37,6 @@ WORKDIR /app
 COPY src src
 COPY bot.py .
 
-ENV PATH="/opt/conda/envs/img2card/bin:${PATH}"
+EXPOSE 80
 
 CMD ["python", "-m", "bot"]
