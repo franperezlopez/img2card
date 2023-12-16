@@ -2,6 +2,7 @@ from typing import Optional, Union
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from functools import cache
+import uuid
 
 class Settings(BaseSettings):
     class Config:
@@ -18,8 +19,10 @@ class Settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT_VISION: str = Field(default="vision", env="AZURE_OPENAI_DEPLOYMENT_VISION")
     AZURE_OPENAI_DEPLOYMENT_AGENT: str = Field(default="agent", env="AZURE_OPENAI_DEPLOYMENT_AGENT")
 
-    AZURE_COGS_ENDPOINT: Optional[str] = Field(default=None, env="AZURE_COGS_ENDPOINT")
-    AZURE_COGS_KEY: Optional[str] = Field(default=None, env="AZURE_COGS_KEY")
+    # AZURE_COGS_ENDPOINT: Optional[str] = Field(default=None, env="AZURE_COGS_ENDPOINT")
+    # AZURE_COGS_KEY: Optional[str] = Field(default=None, env="AZURE_COGS_KEY")
+
+    SERPAPI_API_KEY: Optional[str] = Field(default=None, env="SERPAPI_API_KEY")
 
     LANGCHAIN_TRACING_V2: str = Field(default="true", env="LANGCHAIN_TRACING_V2")
     LANGCHAIN_ENDPOINT: str = Field(default="https://api.smith.langchain.com", env="LANGCHAIN_ENDPOINT")
@@ -27,8 +30,8 @@ class Settings(BaseSettings):
     LANGCHAIN_PROJECT: str = Field(default="img2card", env="LANGCHAIN_PROJECT")
 
     TELEGRAM_TOKEN: str = Field(env="TELEGRAM_TOKEN")
-    TELEGRAM_SECRET: Optional[str] = Field(default=None, env="TELEGRAM_SECRET")
-    TELEGRAM_WEBHOOK_URL: str = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
+    TELEGRAM_SECRET: Optional[str] = Field(default_factory=lambda : str(uuid.uuid4()).replace('-', ''), env="TELEGRAM_SECRET")
+    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
     TELEGRAM_DEV_CHAT_ID: Optional[Union[int, str]] = Field(default=None, env="TELEGRAM_DEV_CHAT_ID")
 
 

@@ -11,16 +11,15 @@ from telegram.constants import ParseMode, ChatAction
 from telegram.ext import (ApplicationBuilder, CallbackContext, CommandHandler,
                           ContextTypes, MessageHandler, Updater, filters)
 
-from src.llm.agent import make_agent
+from src.llm.agent import build_agent
 from src.settings import get_settings
-
 
 
 settings = get_settings()
 
 async def call_agent(image_url):
     logger.info("Calling agent ...")
-    agent = make_agent()
+    agent = build_agent()
     event = await agent.create_card(image_url)
     logger.info(event)
     return event
@@ -42,6 +41,26 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _handle_image(update, context, photo)
 
 async def _handle_image(update, context, photo):
+    def _normalize_fn(text: str):
+        term = "FN:"
+        idx = text.find(term)
+        idx_end = text.find("\n", idx)
+        return text[idx+len(term):idx_end]
+    
+    def _normalize_tel(text: str):
+        for term in ["TEL:", "TEL;"]:
+            idx = text.find(term)
+            if idx > -1:
+                break
+        if idx == -1:
+            return "111 222 333"
+        idx_end = text.find("\n", idx)
+        sub_text = text[idx+len(term):idx_end]
+        if sub_text.find(":") > -1:
+            return sub_text.split(":")[-1]
+        else:
+            return ''.join(re.findall('\d', sub_text))
+
     # Download the image file and save it to a temporary file
     with tempfile.NamedTemporaryFile(delete=True) as f:
         image_path = f.name
@@ -53,14 +72,11 @@ async def _handle_image(update, context, photo):
 
     # Send the card (file) to the user
     if vcf_data:
-        match = re.search(r'\b(\+\d{1,3}\s?)?(\()?(\d{3})(?(2)\))[-.]?\d{3}[-.]?\d{4}\b', vcf_data)
-        if match:
-            phone_number = match.group(0)
-        else:
-            phone_number = "111 222 333"
-        await update.message.reply_contact(phone_number=phone_number, first_name="Test bot", vcard=vcf_data)
+        phone_number = _normalize_tel(vcf_data)
+        first_name = _normalize_fn(vcf_data)
+        await update.message.reply_contact(phone_number=phone_number, first_name=first_name, vcard=vcf_data)
     else:
-        await update.message.reply_text("No event found in image")
+        await update.message.reply_text("No contact found in image")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
@@ -71,6 +87,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""
     logger.info("Echo command ...")
+    logger.info(update.effective_message.location)
     await update.message.reply_text(update.message.text)
 
 
@@ -107,9 +124,13 @@ def main():
     logger.info("Starting bot ...")
     logger.info(settings.model_dump())
     
-    # app.run_polling(allowed_updates=Update.ALL_TYPES)
-    app.run_webhook(listen="0.0.0.0", webhook_url=settings.TELEGRAM_WEBHOOK_URL, port=80,
-                    allowed_updates=Update.ALL_TYPES, secret_token=settings.TELEGRAM_SECRET, drop_pending_updates=True)
+    if settings.TELEGRAM_WEBHOOK_URL:
+        # preferred method for production
+        app.run_webhook(listen="0.0.0.0", webhook_url=settings.TELEGRAM_WEBHOOK_URL, port=80,
+                        allowed_updates=Update.ALL_TYPES, secret_token=settings.TELEGRAM_SECRET, drop_pending_updates=True)
+    else:
+        # preferred method for development
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == '__main__':
