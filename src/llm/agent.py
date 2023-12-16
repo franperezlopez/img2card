@@ -2,10 +2,11 @@ from functools import cache
 from openai import AsyncAzureOpenAI
 import base64
 from loguru import logger
+import json
 
 from src.settings import Settings
 import src.llm.prompt as prompt
-
+from src.llm.places import search
 
 class CardAgent:
     def __init__(self, settings: Settings) -> None:
@@ -18,8 +19,15 @@ class CardAgent:
         image = self._encode_image(image_path)
         vision = await self._generate_vision(image)
         logger.info(f"vision: {vision}")
+        if 'venue' in vision:
+            try:
+                query = ' '.join([value for key,value in self._normalize_json(vision).items() if 'venue' in key])
+                vision = search(image_path, query)
+                vision = json.dumps(vision)
+            except:
+                logger.exception(f"Error parsing vision")
         card = await self._generate_card(vision)
-        logger.info(f"card: {card}")
+        logger.debug(f"card: {card}")
         card = self._postprocess(card)
         return card
 
@@ -53,13 +61,17 @@ class CardAgent:
         idx_start = card.find(BEGIN_CARD)
         idx_end = card.find(END_CARD)
         return card[idx_start:idx_end+len(END_CARD)]
+    
+    def _normalize_json(self, text:str) -> dict:
+        return json.loads(text.strip('`').lstrip('json'))
+
 
     def _encode_image(self, image_path):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
 
 @cache
-def make_agent():
+def build_agent():
     from src.settings import get_settings
 
     settings = get_settings()
