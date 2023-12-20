@@ -1,8 +1,10 @@
+import uuid
+from functools import cache
 from typing import Optional, Union
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from functools import cache
-import uuid
+
 
 class Settings(BaseSettings):
     class Config:
@@ -12,7 +14,7 @@ class Settings(BaseSettings):
         case_sensitive = True
         extra = "ignore"
         # allow_mutation = False
-    
+
     AZURE_OPENAI_API_KEY: str = Field(env="AZURE_OPENAI_API_KEY")
     AZURE_OPENAI_API_BASE: str = Field(env="AZURE_OPENAI_API_BASE")
     AZURE_OPENAI_API_VERSION: str = Field(default="2023-07-01-preview", env="AZURE_OPENAI_API_VERSION")
@@ -30,11 +32,14 @@ class Settings(BaseSettings):
     LANGCHAIN_PROJECT: str = Field(default="img2card", env="LANGCHAIN_PROJECT")
 
     TELEGRAM_TOKEN: str = Field(env="TELEGRAM_TOKEN")
-    TELEGRAM_SECRET: Optional[str] = Field(default_factory=lambda : str(uuid.uuid4()).replace('-', ''), env="TELEGRAM_SECRET")
+    TELEGRAM_SECRET: Optional[str] = Field(
+        default_factory=lambda: str(uuid.uuid4()).replace("-", ""), env="TELEGRAM_SECRET"
+    )
     TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
     TELEGRAM_DEV_CHAT_ID: Optional[Union[int, str]] = Field(default=None, env="TELEGRAM_DEV_CHAT_ID")
 
 
 @cache
 def get_settings() -> Settings:
+    return Settings()
     return Settings()
