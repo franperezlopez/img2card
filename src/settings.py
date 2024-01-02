@@ -1,8 +1,9 @@
 import uuid
-from functools import cache
+from functools import cache, cached_property
 from typing import Optional, Union
 
-from pydantic import Field
+from langchain.callbacks import LangChainTracer
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings
 
 
@@ -26,10 +27,9 @@ class Settings(BaseSettings):
 
     SERPAPI_API_KEY: Optional[str] = Field(default=None, env="SERPAPI_API_KEY")
 
-    LANGCHAIN_TRACING_V2: str = Field(default="true", env="LANGCHAIN_TRACING_V2")
-    LANGCHAIN_ENDPOINT: str = Field(default="https://api.smith.langchain.com", env="LANGCHAIN_ENDPOINT")
-    LANGCHAIN_API_KEY: Optional[str] = Field(default=None, env="LANGCHAIN_API_KEY")
-    LANGCHAIN_PROJECT: str = Field(default="img2card", env="LANGCHAIN_PROJECT")
+    LANGSMITH_ENDPOINT: str = Field(default="https://api.smith.langchain.com", env="LANGSMITH_ENDPOINT")
+    LANGSMITH_API_KEY: Optional[str] = Field(default=None, env="LANGSMITH_API_KEY")
+    LANGSMITH_PROJECT: str = Field(default="img2card", env="LANGSMITH_PROJECT")
 
     TELEGRAM_TOKEN: str = Field(env="TELEGRAM_TOKEN")
     TELEGRAM_SECRET: Optional[str] = Field(
@@ -38,8 +38,22 @@ class Settings(BaseSettings):
     TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
     TELEGRAM_DEV_CHAT_ID: Optional[Union[int, str]] = Field(default=None, env="TELEGRAM_DEV_CHAT_ID")
 
+    @computed_field
+    @cached_property
+    def LANGSMITH_TRACER(self) -> Optional[LangChainTracer]:
+        return get_langsmith_tracer(self)
+
 
 @cache
 def get_settings() -> Settings:
     return Settings()
-    return Settings()
+
+
+def get_langsmith_tracer(settings) -> Optional[LangChainTracer]:
+    if settings.LANGSMITH_API_KEY:
+        from langsmith import Client
+        return LangChainTracer(
+            project_name=settings.LANGSMITH_PROJECT,
+            client=Client(api_url=settings.LANGSMITH_ENDPOINT, api_key=settings.LANGSMITH_API_KEY),
+        )
+    return None

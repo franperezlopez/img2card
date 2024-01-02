@@ -221,5 +221,5 @@ class PlacesTool():
         logger.debug(f"locals:\n{locals}")
         if len(locals) > 0:
             place = locals[0] | SerperHelper.search_by_place_id(self.settings, query, locals[0].get("place_id"))
-            logger.info(f"place:{place}")
+            logger.debug(f"place: {place}")
             return place

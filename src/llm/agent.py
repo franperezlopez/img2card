@@ -3,8 +3,10 @@ import json
 from functools import cache
 from typing import Literal, Optional
 
+import randomname
+from langchain.chat_models import AzureChatOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from loguru import logger
-from openai import AsyncAzureOpenAI
 from PIL import Image
 
 import src.llm.prompt as prompt
@@ -25,21 +27,39 @@ class OpenAITool:
     """
 
     def __init__(self, settings: Settings) -> None:
-            """
-            Initializes the tool.
+        """
+        Initializes the tool.
 
-            Args:
-                settings (Settings): An instance of the Settings class containing the required Azure OpenAI API key, version and endpoint.
+        Args:
+            settings (Settings): An instance of the Settings class containing the required Azure OpenAI API key, version and endpoint.
 
-            Returns:
-                None
-            """
-            self._client = AsyncAzureOpenAI(
-                api_key=settings.AZURE_OPENAI_API_KEY,
-                api_version=settings.AZURE_OPENAI_API_VERSION,
-                azure_endpoint=settings.AZURE_OPENAI_API_BASE,
-            )
-            self._settings = settings
+        Returns:
+            None
+        """
+        common_client_args = {
+            "openai_api_key": settings.AZURE_OPENAI_API_KEY,
+            "openai_api_version": settings.AZURE_OPENAI_API_VERSION,
+            "azure_endpoint": settings.AZURE_OPENAI_API_BASE,
+            "streaming": False,
+        }
+
+        if settings.LANGSMITH_TRACER:
+            common_client_args["callbacks"] = [settings.LANGSMITH_TRACER]
+
+        self._client_vision = AzureChatOpenAI(
+            **common_client_args,
+            azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT_VISION,
+            max_tokens=500,
+        )
+
+        self._client_agent = AzureChatOpenAI(
+            **common_client_args,
+            azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT_AGENT,
+        )
+
+        self._settings = settings
+
+        self._run_name = "img2card"
 
     def _image_base64_format(self, image_path):
         format = Image.open(image_path).format.lower()
@@ -53,6 +73,28 @@ class OpenAITool:
     def _image_encode(self, image_path):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
+
+    @property
+    def run_name(self) -> Optional[str]:
+        """
+        Get the name of the run.
+
+        Returns:
+            Optional[str]: The name of the run.
+
+        """
+        return self._run_name
+
+    @run_name.setter
+    def run_name(self, name: Optional[str]) -> None:
+        """
+        Set the name of the run.
+
+        Args:
+            name (Optional[str]): The name of the run.
+
+        """
+        self._run_name = name
 
     async def generate_vision(self, image_path: str, detail: Literal["low", "high"] = "low") -> str:
         """
@@ -70,19 +112,16 @@ class OpenAITool:
         format = self._image_base64_format(image_path)
 
         messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt.VISION},
+            HumanMessage(
+                content=[
+                    {"type": "text", "text": prompt.VISION_TOOL},
                     {"type": "image_url", "image_url": {"url": f"data:{format};base64,{image}", "detail": detail}},
                 ],
-            },
+            )
         ]
+        result = await self._client_vision.ainvoke(messages, config={"run_name": self.run_name})
+        vision_response = result.content
 
-        result = await self._client.chat.completions.create(
-            messages=messages, model=self._settings.AZURE_OPENAI_DEPLOYMENT_VISION, max_tokens=500, stream=False, seed=42
-        )
-        vision_response = result.choices[0].message.content
         return vision_response
 
     async def generate_card(self, vision_transcription: str) -> str:
@@ -97,13 +136,13 @@ class OpenAITool:
 
         """
         messages = [
-            {"role": "system", "content": "you are an expert in vCard format"},
-            {"role": "assistant", "content": vision_transcription},
-            {"role": "user", "content": prompt.AGENT},
+            SystemMessage(content=prompt.AGENT_SYSTEM),
+            AIMessage(content=vision_transcription),
+            HumanMessage(content=prompt.AGENT_TOOL),
         ]
+        result = await self._client_agent.ainvoke(messages, config={"run_name": self.run_name})
+        card_response = result.content
 
-        result = await self._client.chat.completions.create(messages=messages, model="agent", stream=False, seed=42)
-        card_response = result.choices[0].message.content
         return card_response
 
 
@@ -120,42 +159,47 @@ class CardAgent:
         _llm (OpenAITool): The tool for generating vision transcriptions from images.
 
     """
+
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._places = PlacesTool(settings)
         self._llm = OpenAITool(settings)
 
+    async def create_card(
+        self, image_path: str, detail: str = "low", lat: Optional[float] = None, lon: Optional[float] = None
+    ) -> str:
+        """
+        Creates a card based on the provided image path and additional details.
 
-    async def create_card(self, image_path: str, detail: str = "low", lat: Optional[float] = None, lon: Optional[float] = None) -> str:
-            """
-            Creates a card based on the provided image path and additional details.
+        Args:
+            image_path (str): The path to the image file.
+            detail (str, optional): The level of detail for generating the vision. Defaults to "low".
+            lat (float, optional): The latitude coordinate. Defaults to None.
+            lon (float, optional): The longitude coordinate. Defaults to None.
 
-            Args:
-                image_path (str): The path to the image file.
-                detail (str, optional): The level of detail for generating the vision. Defaults to "low".
-                lat (float, optional): The latitude coordinate. Defaults to None.
-                lon (float, optional): The longitude coordinate. Defaults to None.
-
-            Returns:
-                str: The generated card.
-            """
-            vision_transcription = await self._llm.generate_vision(image_path, detail)
-            logger.info(f"vision: {vision_transcription}")
-            if "venue" in vision_transcription:
-                try:
-                    query = " ".join([value for key, value in self._normalize_json(vision_transcription).items() if "venue" in key])
-                    vision_transcription = self._places.search(image_path, query, lat, lon)
-                    if vision_transcription:
-                        vision_transcription = json.dumps(vision_transcription)
-                    else:
-                        # TODO: if detail == "low", try again with detail == "high
-                        return None
-                except Exception:
-                    logger.exception("Error parsing vision")
-            card = await self._llm.generate_card(vision_transcription)
-            logger.debug(f"card: {card}")
-            card = self._postprocess(card)
-            return card
+        Returns:
+            str: The generated card.
+        """
+        self._llm.run_name = randomname.get_name()
+        vision_transcription = await self._llm.generate_vision(image_path, detail)
+        logger.info(f"vision: {vision_transcription}")
+        if "venue" in vision_transcription:
+            try:
+                query = " ".join(
+                    [value for key, value in self._normalize_json(vision_transcription).items() if "venue" in key]
+                )
+                vision_transcription = self._places.search(image_path, query, lat, lon)
+                if vision_transcription:
+                    vision_transcription = json.dumps(vision_transcription)
+                else:
+                    # TODO: if detail == "low", try again with detail == "high
+                    return None
+            except Exception:
+                logger.exception("Error parsing vision")
+        card = await self._llm.generate_card(vision_transcription)
+        logger.debug(f"card: {card}")
+        card = self._postprocess(card)
+        return card
 
     def _postprocess(self, card: str) -> str:
         BEGIN_CARD = "BEGIN:VCARD"
