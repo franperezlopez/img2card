@@ -1,0 +1,6 @@
+ipykernel
+ruff
+pytest
+pytest-cov
+pytest-moq
+mypy
