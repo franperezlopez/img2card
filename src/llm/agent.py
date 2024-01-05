@@ -41,6 +41,7 @@ class OpenAITool:
             "openai_api_version": settings.AZURE_OPENAI_API_VERSION,
             "azure_endpoint": settings.AZURE_OPENAI_API_BASE,
             "streaming": False,
+            "metadata": {"container_app_name": settings.CONTAINER_APP_NAME},
         }
 
         if settings.LANGSMITH_TRACER:
@@ -119,7 +120,7 @@ class OpenAITool:
                 ],
             )
         ]
-        result = await self._client_vision.ainvoke(messages, config={"run_name": self.run_name})
+        result = await self._client_vision.ainvoke(messages, config={"run_name": self.run_name, "tags": ["vision"]})
         vision_response = result.content
 
         return vision_response
@@ -140,7 +141,7 @@ class OpenAITool:
             AIMessage(content=vision_transcription),
             HumanMessage(content=prompt.AGENT_TOOL),
         ]
-        result = await self._client_agent.ainvoke(messages, config={"run_name": self.run_name})
+        result = await self._client_agent.ainvoke(messages, config={"run_name": self.run_name, "tags": ["agent"]})
         card_response = result.content
 
         return card_response

@@ -9,6 +9,7 @@ from PIL import Image
 from serpapi import GoogleSearch
 
 from src.settings import Settings
+from src.utils import get_value, update_if_not_empty, update_key_if_not_empty
 
 
 class EXIFHelper:
@@ -61,9 +62,10 @@ class EXIFHelper:
         return (latitude, longitude)
 
 
-class SerperHelper:
+class SerpapiHelper:
     ENGINE = "google_local"
     DOMAIN = "google.es"
+    GOOGLE_SEPARATOR = '·'
 
     @staticmethod
     def generate_uule_v2(latitude, longitude, radius) -> str:
@@ -91,21 +93,23 @@ class SerperHelper:
 
         return "a+" + uule_v2_string_encoded
 
-
+    @classmethod
+    def _normalize_distance(cls, local: Dict, default = None) -> Optional[float]:
+        distance = default
+        try:
+            distance = float(local["address"].split(cls.GOOGLE_SEPARATOR)[0].strip().split(" ")[0])
+        except Exception:
+            logger.error(f"Error parsing distance {local['address']}")
+        return distance
 
     @classmethod
-    def _normalize_distance(cls, local: Dict) -> Optional[float]:
-        distance = local.get("type")
-        try:
-            if not distance:
-                distance = float(local["address"].split("·")[0].strip().split(" ")[0])
-            else:
-                distance = float(distance.split(" ")[0])
-            return distance
-        except Exception:
-            logger.error(f"Error parsing distance {distance} from {local['address']}")
+    def _normalize_address(cls, local: Dict) -> str:
+        if not local.get("address", None):
             return None
-
+        if cls.GOOGLE_SEPARATOR in local["address"]:
+            return local["address"][local["address"].find(cls.GOOGLE_SEPARATOR) + 2 :]
+        else:
+            return local["address"]
 
     @classmethod
     def _common_parameters(cls, settings: Settings) -> Dict:
@@ -115,7 +119,7 @@ class SerperHelper:
             "google_domain": cls.DOMAIN,
             "gl": "es",
             "hl": "en",
-            "device": "tablet"
+            "device": "desktop"
         }
 
     @classmethod
@@ -148,19 +152,20 @@ class SerperHelper:
         local_results = cls._search(settings, {"q": query, "uule": uule})
 
         locals = []
-        for local in local_results:
-            distance = cls._normalize_distance(local)
-            if distance:
-                locals.append(
-                    {
-                        "title": local.get("title"),
-                        "place_id": local.get("place_id"),
-                        "address": local["address"][local["address"].find("·") + 2 :],
-                        "description": local.get("description"),
-                        # 'extra': [local.get('service_options'), local.get('hours')],
-                        "distance": distance,
-                    }
-                )
+        for idx, local_result in enumerate(local_results):
+            distance = cls._normalize_distance(local_result, default=idx)
+            address = cls._normalize_address(local_result)
+
+            local = {"distance": distance}
+            local = update_key_if_not_empty(local_result, local, "title")
+            local = update_key_if_not_empty(local_result, local, "place_id")
+            local = update_key_if_not_empty(local_result, local, "description")
+            local = update_key_if_not_empty(local_result, local, "type")
+            local = update_key_if_not_empty(local_result, local, "phone")
+            local = update_if_not_empty(local, "address", address)
+            local = update_if_not_empty(local, "website", get_value(local_result, None, "links", "website"))
+            locals.append(local)
+
         return sorted(locals, key=lambda x: x["distance"])
 
     @classmethod
@@ -180,16 +185,46 @@ class SerperHelper:
             return {}
 
         local_results = cls._search(settings, {"q": query, "ludocid": place_id})
+        if len(local_results) == 0:
+            logger.warning(f"No results found for place ID {place_id}")
+            return {}
+        local_result = local_results[0]
 
-        result = {
-            "phone": local_results[0].get("phone"),
-            "type": local_results[0].get("type"),
-            "title": local_results[0].get("title"),
-            "gps_coordinates": local_results[0].get("gps_coordinates"),
+        local = update_key_if_not_empty(local_result, {}, "phone")
+        local = update_key_if_not_empty(local_result, local, "type")
+        local = update_key_if_not_empty(local_result, local, "title")
+        local = update_if_not_empty(local, "address", cls._normalize_address(local_result))
+        local = update_if_not_empty(local, "gps_coordinates", local_result.get("gps_coordinates", None))
+        local = update_if_not_empty(local, "website", get_value(local_result, None, "links", "website"))
+
+        return local
+
+
+class GeoapifyHelper:
+    @classmethod
+    def reverse_geocode(cls, settings: Settings, lat: float, lon: float) -> Optional[Dict]:
+        """
+        Reverse geocoding using Geoapify API.
+
+        Args:
+            lat (float): The latitude coordinate.
+            lon (float): The longitude coordinate.
+
+        Returns:
+            Optional[Dict]: A dictionary containing the address of the location.
+        """
+        from geobatchpy import Client
+        client = Client(settings.GEOAPIFY_API_KEY)
+        response = client.reverse_geocode(round(lon,4), round(lat,4))
+
+        properties = response["features"][0]["properties"]
+        return {
+            "country": properties.get("country"),
+            "state": properties.get("state"),
+            "county": properties.get("county"),
+            "city": properties.get("city"),
+            "postcode": properties.get("postcode"),
         }
-
-        return result
-
 
 class PlacesTool():
     RADIUS = 300
@@ -215,11 +250,15 @@ class PlacesTool():
             latitude, longitude = EXIFHelper.extract_coordinates(img)
             if not latitude or not longitude:
                 return None
-        uule = SerperHelper.generate_uule_v2(latitude, longitude, self.RADIUS)
+        uule = SerpapiHelper.generate_uule_v2(latitude, longitude, self.RADIUS)
         logger.info(f"uule: {uule}")
-        locals = SerperHelper.search_by_uule(self.settings, query, uule)
+        place = GeoapifyHelper.reverse_geocode(self.settings, latitude, longitude)
+        query += f", {place['city']}, {place['country']}"
+        locals = SerpapiHelper.search_by_uule(self.settings, query, uule)
         logger.debug(f"locals:\n{locals}")
         if len(locals) > 0:
-            place = locals[0] | SerperHelper.search_by_place_id(self.settings, query, locals[0].get("place_id"))
+            place |= locals[0]
+            # if "phone" not in place:
+            place |= SerpapiHelper.search_by_place_id(self.settings, query, place.get("place_id"))
             logger.debug(f"place: {place}")
             return place

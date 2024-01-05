@@ -4,18 +4,27 @@ import re
 import tempfile
 import traceback
 from enum import IntEnum
+from io import BytesIO
 from typing import Optional
 
+import requests
 from loguru import logger
 from PIL import Image
 from telegram import Location, ReplyKeyboardRemove, Update
 from telegram.constants import ChatAction, ParseMode
-from telegram.ext import (ApplicationBuilder, CommandHandler, ContextTypes,
-                          ConversationHandler, MessageHandler, filters)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 from src.llm.agent import build_agent
 from src.llm.places import EXIFHelper
 from src.settings import get_settings
+from src.utils import is_empty
 
 settings = get_settings()
 
@@ -38,12 +47,15 @@ async def call_agent(image_url, detail: str, location: Optional[Location] = None
         kwargs["lat"] = location.latitude
         kwargs["lon"] = location.longitude
     event = await agent.create_card(image_url, detail, **kwargs)
-    logger.info(event)
     return event
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("Start command ...")
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    if "location" in context.user_data:
+        del context.user_data["location"]
+        logger.debug("location removed from user_data")
     await update.message.reply_text("Bienvenido! Para convertir una imagen en una tarjeta de contacto, envíame una imagen.", 
                                     reply_markup=ReplyKeyboardRemove())
 
@@ -57,7 +69,8 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         photo = await context.bot.get_file(update.message.photo[-1])
         if context.user_data.get("location"):
             await _handle_image(update, context, photo, detail="high", location=context.user_data["location"])
-            return ConversationHandler.END
+            # return ConversationHandler.END
+            return PHOTO
         context.chat_data["photo"] = photo
         await update.message.reply_text("¿Puedes enviarme tu ubicación?", 
                                         reply_markup=ReplyKeyboardRemove())
@@ -66,14 +79,18 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # uncompressed image -> do card
         # TODO: refactor creating TelegramImage class
         photo = await context.bot.get_file(update.message.document)
-        img = Image.open(photo)
+        # TODO: change to aiohttp
+        photo_content = BytesIO(requests.get(photo.file_path).content)
+        img = Image.open(photo_content)
         lat, lon = EXIFHelper.extract_coordinates(img)
         if lat and lon:
             await _handle_image(update, context, photo, detail="low")
-            return ConversationHandler.END
+            # return ConversationHandler.END
+            return PHOTO
         elif context.user_data.get("location"):
             await _handle_image(update, context, photo, detail="low", location=context.user_data["location"])
-            return ConversationHandler.END
+            # return ConversationHandler.END
+            return PHOTO
         else:
             context.chat_data["photo"] = photo
             await update.message.reply_text("¿Puedes enviarme tu ubicación?", 
@@ -96,24 +113,8 @@ async def location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                                         reply_markup=ReplyKeyboardRemove())
         return NO_GPS
 
-# async def handle_image_compressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     logger.info("Handling image compressed ...")
 
-#     photo = await context.bot.get_file(update.message.photo[-1])
-#     await _handle_image(update, context, photo)
-
-
-# async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     # Get the image file from the message
-#     logger.info("Handling image ...")
-
-#     # user = update.message.from_user
-#     await update.message.reply_chat_action(action=ChatAction.UPLOAD_PHOTO)
-#     photo = await context.bot.get_file(update.message.document)
-#     await _handle_image(update, context, photo)
-
-
-async def _handle_image(update, context, photo, detail: str, location: Optional[Location] = None):
+async def _handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE, photo, detail: str, location: Optional[Location] = None):
     def _normalize_fn(text: str):
         term = "FN:"
         idx = text.find(term)
@@ -142,12 +143,17 @@ async def _handle_image(update, context, photo, detail: str, location: Optional[
         # Process the image and generate the ICS file
         await update.message.reply_chat_action(action=ChatAction.TYPING)
         vcf_data = await call_agent(image_path, detail, location)
+        vcf_data = vcf_data.encode("utf7", "ignore").decode("utf7")
+        logger.debug(f"vcf_data: {vcf_data}")
 
     # Send the card (file) to the user
     if vcf_data:
         phone_number = _normalize_tel(vcf_data)
         first_name = _normalize_fn(vcf_data)
-        await update.message.reply_contact(phone_number=phone_number, first_name=first_name, vcard=vcf_data)
+        if is_empty(phone_number) or is_empty(first_name):
+            await update.message.reply_text("No se pudo generar la tarjeta.")
+        else:
+            await update.message.reply_contact(phone_number=phone_number, first_name=first_name, vcard=vcf_data)
     else:
         await update.message.reply_text("No se pudo generar la tarjeta.")
 
@@ -184,7 +190,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def cancel(update, context):
     """Cancel the current operation and end the conversation"""
-    update.message.reply_text("Operación cancelada.")
+    update.message.reply_text("Introduce /start para comenzar de nuevo.")
     return ConversationHandler.END
 
 
