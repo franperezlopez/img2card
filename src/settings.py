@@ -22,10 +22,8 @@ class Settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT_VISION: str = Field(default="vision", env="AZURE_OPENAI_DEPLOYMENT_VISION")
     AZURE_OPENAI_DEPLOYMENT_AGENT: str = Field(default="agent", env="AZURE_OPENAI_DEPLOYMENT_AGENT")
 
-    # AZURE_COGS_ENDPOINT: Optional[str] = Field(default=None, env="AZURE_COGS_ENDPOINT")
-    # AZURE_COGS_KEY: Optional[str] = Field(default=None, env="AZURE_COGS_KEY")
-
     SERPAPI_API_KEY: Optional[str] = Field(default=None, env="SERPAPI_API_KEY")
+    GEOAPIFY_API_KEY: Optional[str] = Field(default=None, env="GEOAPIFY_API_KEY")
 
     LANGSMITH_ENDPOINT: str = Field(default="https://api.smith.langchain.com", env="LANGSMITH_ENDPOINT")
     LANGSMITH_API_KEY: Optional[str] = Field(default=None, env="LANGSMITH_API_KEY")
@@ -37,6 +35,8 @@ class Settings(BaseSettings):
     )
     TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
     TELEGRAM_DEV_CHAT_ID: Optional[Union[int, str]] = Field(default=None, env="TELEGRAM_DEV_CHAT_ID")
+
+    CONTAINER_APP_NAME: str = Field(default="debug", env="CONTAINER_APP_NAME")
 
     @computed_field
     @cached_property

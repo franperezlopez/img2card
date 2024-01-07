@@ -2,5 +2,6 @@ ipykernel
 ruff
 pytest
 pytest-cov
-pytest-moq
+pytest-mock
+pytest-asyncio
 mypy
