@@ -4,8 +4,10 @@ from functools import cache
 from typing import Literal, Optional
 
 import randomname
-from langchain.chat_models import AzureChatOpenAI
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import AzureChatOpenAI, AzureOpenAI
 from loguru import logger
 from PIL import Image
 
@@ -37,7 +39,7 @@ class OpenAITool:
             None
         """
         common_client_args = {
-            "openai_api_key": settings.AZURE_OPENAI_API_KEY,
+            "api_key": settings.AZURE_OPENAI_API_KEY,
             "openai_api_version": settings.AZURE_OPENAI_API_VERSION,
             "azure_endpoint": settings.AZURE_OPENAI_API_BASE,
             "streaming": False,
@@ -47,20 +49,53 @@ class OpenAITool:
         if settings.LANGSMITH_TRACER:
             common_client_args["callbacks"] = [settings.LANGSMITH_TRACER]
 
-        self._client_vision = AzureChatOpenAI(
+        self._vision_chain = self._build_vision_chain(settings, common_client_args)
+        self._agent_chain = self._build_agent_chain(settings, common_client_args)
+
+        self._run_name = "img2card"
+
+    def _build_vision_chain(self, settings, common_client_args):
+        def _prompt_generator(data_dict: dict):
+            messages = [
+                HumanMessage(
+                    content=[
+                        {"type": "text", "text": prompt.VISION_TOOL},
+                        {"type": "image_url", "image_url": {"url": f"data:{data_dict['format']};base64,{data_dict['image']}", 
+                                                            "detail": data_dict['detail']}},
+                    ],
+                )
+            ]
+            return messages
+
+        llm = AzureChatOpenAI(
             **common_client_args,
             azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT_VISION,
+            model_name="gpt-4-vision-preview",
             max_tokens=500,
         )
 
-        self._client_agent = AzureChatOpenAI(
+        return _prompt_generator | llm | StrOutputParser()
+
+    def _build_agent_chain(self, settings, common_client_args):
+        llm = AzureOpenAI(
             **common_client_args,
+            model_name="gpt-3.5-turbo-instruct",
             azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT_AGENT,
         )
 
-        self._settings = settings
+        message = f"""Role:
+{prompt.AGENT_SYSTEM}
 
-        self._run_name = "img2card"
+JSON:
+{{vision_transcription}}
+
+Instructions:
+{prompt.AGENT_TOOL}
+
+Response:
+"""
+        card_prompt = PromptTemplate.from_template(message)
+        return card_prompt | llm | StrOutputParser()
 
     def _image_base64_format(self, image_path):
         format = Image.open(image_path).format.lower()
@@ -112,16 +147,8 @@ class OpenAITool:
         image = self._image_encode(image_path)
         format = self._image_base64_format(image_path)
 
-        messages = [
-            HumanMessage(
-                content=[
-                    {"type": "text", "text": prompt.VISION_TOOL},
-                    {"type": "image_url", "image_url": {"url": f"data:{format};base64,{image}", "detail": detail}},
-                ],
-            )
-        ]
-        result = await self._client_vision.ainvoke(messages, config={"run_name": self.run_name, "tags": ["vision"]})
-        vision_response = result.content
+        vision_response = await self._vision_chain.ainvoke({"image": image, "format": format, "detail": detail},
+                                                           config={"run_name": self.run_name, "tags": ["vision"]})
 
         return vision_response
 
@@ -136,13 +163,7 @@ class OpenAITool:
             str: The generated card response.
 
         """
-        messages = [
-            SystemMessage(content=prompt.AGENT_SYSTEM),
-            AIMessage(content=vision_transcription),
-            HumanMessage(content=prompt.AGENT_TOOL),
-        ]
-        result = await self._client_agent.ainvoke(messages, config={"run_name": self.run_name, "tags": ["agent"]})
-        card_response = result.content
+        card_response = await self._agent_chain.ainvoke({"vision_transcription": vision_transcription}, config={"run_name": self.run_name, "tags": ["agent"]})
 
         return card_response
 

@@ -97,7 +97,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                                             reply_markup=ReplyKeyboardRemove())
             return NO_GPS
 
-
 async def location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("Handling location ...")
 
@@ -112,7 +111,6 @@ async def location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text("¿Puedes enviarme tu ubicación?", 
                                         reply_markup=ReplyKeyboardRemove())
         return NO_GPS
-
 
 async def _handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE, photo, detail: str, location: Optional[Location] = None):
     def _normalize_fn(text: str):
@@ -135,6 +133,9 @@ async def _handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE, phot
         else:
             return "".join(re.findall("\d", sub_text))
 
+    def _normalize_vcf(vcf: str):
+        return vcf.encode('latin-1', errors='ignore').decode('latin-1')
+
     # Download the image file and save it to a temporary file
     with tempfile.NamedTemporaryFile(delete=True) as f:
         image_path = f.name
@@ -153,16 +154,14 @@ async def _handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE, phot
         if is_empty(phone_number) or is_empty(first_name):
             await update.message.reply_text("No se pudo generar la tarjeta.")
         else:
-            await update.message.reply_contact(phone_number=phone_number, first_name=first_name, vcard=vcf_data)
+            await update.message.reply_contact(phone_number=phone_number, first_name=first_name, vcard=_normalize_vcf(vcf_data))
     else:
         await update.message.reply_text("No se pudo generar la tarjeta.")
-
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
     logger.info("Help command ...")
     await update.message.reply_text("Help for you ...")
-
 
 async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Echo the user message."""

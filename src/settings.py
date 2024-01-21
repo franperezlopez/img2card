@@ -2,7 +2,7 @@ import uuid
 from functools import cache, cached_property
 from typing import Optional, Union
 
-from langchain.callbacks import LangChainTracer
+from langchain_core.tracers import LangChainTracer
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings
 
@@ -18,9 +18,9 @@ class Settings(BaseSettings):
 
     AZURE_OPENAI_API_KEY: str = Field(env="AZURE_OPENAI_API_KEY")
     AZURE_OPENAI_API_BASE: str = Field(env="AZURE_OPENAI_API_BASE")
-    AZURE_OPENAI_API_VERSION: str = Field(default="2023-07-01-preview", env="AZURE_OPENAI_API_VERSION")
+    AZURE_OPENAI_API_VERSION: str = Field(default="2023-12-01-preview", env="AZURE_OPENAI_API_VERSION")
     AZURE_OPENAI_DEPLOYMENT_VISION: str = Field(default="vision", env="AZURE_OPENAI_DEPLOYMENT_VISION")
-    AZURE_OPENAI_DEPLOYMENT_AGENT: str = Field(default="agent", env="AZURE_OPENAI_DEPLOYMENT_AGENT")
+    AZURE_OPENAI_DEPLOYMENT_AGENT: str = Field(default="instruct", env="AZURE_OPENAI_DEPLOYMENT_AGENT")
 
     SERPAPI_API_KEY: Optional[str] = Field(default=None, env="SERPAPI_API_KEY")
     GEOAPIFY_API_KEY: Optional[str] = Field(default=None, env="GEOAPIFY_API_KEY")
