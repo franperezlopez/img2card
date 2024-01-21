@@ -249,6 +249,7 @@ class PlacesTool():
             img = Image.open(image_path)
             latitude, longitude = EXIFHelper.extract_coordinates(img)
             if not latitude or not longitude:
+                logger.warning("No coordinates found in image")
                 return None
         uule = SerpapiHelper.generate_uule_v2(latitude, longitude, self.RADIUS)
         logger.info(f"uule: {uule}")
