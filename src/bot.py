@@ -46,7 +46,7 @@ async def call_agent(image_url, detail: str, location: Optional[Location] = None
     if location:
         kwargs["lat"] = location.latitude
         kwargs["lon"] = location.longitude
-    event = await agent.create_card(image_url, detail, **kwargs)
+    event = await agent.create_card(image_url, detail=detail, **kwargs)
     return event
 
 

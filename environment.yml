@@ -9,6 +9,9 @@ dependencies:
   - pydantic=2.5.2
   - pydantic-settings=2.1.0
   - pillow=10.1.0
+  - fastapi
+  - uvicorn
+  - python-multipart
   - pip
   - pip:
     - langchain-openai==0.0.3
