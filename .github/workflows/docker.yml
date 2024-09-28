@@ -27,7 +27,7 @@ jobs:
     - name: Build and push API Docker image
       uses: docker/build-push-action@v5.1.0
       with:
-        context: ./docker
+        context: .
         file: ./docker/api.Dockerfile
         push: true
         tags: ghcr.io/${{ github.repository }}/api:latest
@@ -35,7 +35,7 @@ jobs:
     - name: Build and push Bot Docker image
       uses: docker/build-push-action@v5.1.0
       with:
-        context: ./docker
+        context: .
         file: ./docker/bot.Dockerfile
         push: true
         tags: ghcr.io/${{ github.repository }}/bot:latest
