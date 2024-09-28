@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.llm.agent import CardAgent, build_agent
 from src.llm.places import EXIFHelper
 from src.utils import is_empty
-from dataclasses import dataclass
 from pydantic import BaseModel
 from loguru import logger
 
@@ -20,7 +19,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://localhost:3000"],  # Add your frontend URL
+    allow_origins=[os.getenv("APP_URL", "http://localhost:3000")],  # Add your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

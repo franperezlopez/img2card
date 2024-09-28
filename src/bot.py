@@ -3,6 +3,7 @@ import json
 import re
 import tempfile
 import traceback
+import aiohttp
 from enum import IntEnum
 from io import BytesIO
 from typing import Optional
@@ -21,7 +22,6 @@ from telegram.ext import (
     filters,
 )
 
-from src.llm.agent import build_agent
 from src.llm.places import EXIFHelper
 from src.settings import get_settings
 from src.utils import is_empty
@@ -39,16 +39,23 @@ class States(IntEnum):
 PHOTO = 1
 NO_GPS = 2
 
-async def call_agent(image_url, detail: str, location: Optional[Location] = None):
-    logger.info("Calling agent ...")
-    agent = build_agent()
-    kwargs = {}
-    if location:
-        kwargs["lat"] = location.latitude
-        kwargs["lon"] = location.longitude
-    event = await agent.create_card(image_url, detail=detail, **kwargs)
-    return event
-
+async def call_agent(image_path: str, location: Optional[Location] = None):
+    logger.info("Calling agent via API ...")
+    api_url = f"{settings.API_URL}/get_ics_card/"
+    
+    async with aiohttp.ClientSession() as session:
+        data = aiohttp.FormData()
+        data.add_field('photo', open(image_path, 'rb'))
+        if location:
+            data.add_field('latitude', str(location.latitude))
+            data.add_field('longitude', str(location.longitude))
+        
+        async with session.post(api_url, data=data) as response:
+            if response.status == 200:
+                return await response.text()
+            else:
+                logger.error(f"API call failed with status {response.status}")
+                return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("Start command ...")
@@ -72,7 +79,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             # return ConversationHandler.END
             return PHOTO
         context.chat_data["photo"] = photo
-        await update.message.reply_text("¿Puedes enviarme tu ubicación?", 
+        await update.message.reply_text("¿Puedes compartir tu ubicación?", 
                                         reply_markup=ReplyKeyboardRemove())
         return NO_GPS
     else:
@@ -93,7 +100,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             return PHOTO
         else:
             context.chat_data["photo"] = photo
-            await update.message.reply_text("¿Puedes enviarme tu ubicación?", 
+            await update.message.reply_text("¿Puedes compartir tu ubicación?", 
                                             reply_markup=ReplyKeyboardRemove())
             return NO_GPS
 
