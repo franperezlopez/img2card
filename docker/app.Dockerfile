@@ -1,6 +1,9 @@
 # Use Node.js as the base image
 FROM node:18-alpine AS builder
 
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+
 # Set the working directory
 WORKDIR /app
 
@@ -19,6 +22,9 @@ RUN npm run build
 # Start a new stage for a smaller production image
 FROM node:18-alpine AS runner
 
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+
 WORKDIR /app
 
 # Copy necessary files from the builder stage
@@ -32,6 +38,8 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Expose the port the app runs on
 EXPOSE 3000
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
 
 # Start the application
 CMD ["npm", "start"]

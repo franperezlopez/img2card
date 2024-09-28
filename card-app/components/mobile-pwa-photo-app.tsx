@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Camera, Image, X, Send, Calendar, MapPin } from "lucide-react"
+import { useEnv } from "../env/provider"
 
-// Add this near the top of the file
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Remove this line
+//const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface LocationData {
   latitude: number;
@@ -14,6 +15,9 @@ interface LocationData {
 }
 
 export function MobilePwaPhotoApp() {
+  const env = useEnv();
+  const apiUrl = (env as { API_URL?: string }).API_URL;
+
   const [photo, setPhoto] = useState<string | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [calendarData, setCalendarData] = useState<string | null>(null)
@@ -114,7 +118,7 @@ export function MobilePwaPhotoApp() {
         formData.append('photo', blob, 'photo.jpg')
       }
 
-      let url = `${API_URL}/get_ics_card/`
+      let url = `${apiUrl}/get_ics_card/`
       if (location) {
         url += `?latitude=${location.latitude}&longitude=${location.longitude}`
       }
@@ -138,41 +142,6 @@ export function MobilePwaPhotoApp() {
       setLoading(false)
     }
   }
-//     setLoading(true)
-//     try {
-//       // Simulating API call
-//       await new Promise(resolve => setTimeout(resolve, 2000))
-//       // Simulated response with the sent data
-//       const sentData = {
-//         photo: photo,
-//         location: location,
-//       }
-//       console.log("Sent data:", sentData)
-//       // Simulated calendar data
-//       const simulatedCalendarData = `
-// BEGIN:VCALENDAR
-// VERSION:2.0
-// PRODID:-//hacksw/handcal//NONSGML v1.0//EN
-// BEGIN:VEVENT
-// UID:uid1@example.com
-// DTSTAMP:20230101T000000Z
-// DTSTART:20230715T090000Z
-// DTEND:20230715T100000Z
-// SUMMARY:Event extracted from image
-// DESCRIPTION:This is a simulated event based on the image you sent.
-// LOCATION:${location ? `${location.latitude}, ${location.longitude}` : 'Unknown'}
-// END:VEVENT
-// END:VCALENDAR
-//       `.trim()
-//       setCalendarData(simulatedCalendarData)
-//       console.log("Photo and location sent successfully")
-//     } catch (error) {
-//       console.error("Error sending photo:", error)
-//       alert("Failed to process the image. Please try again.")
-//     } finally {
-//       setLoading(false)
-//     }
-//  }
 
   const handleAddToCalendar = () => {
     if (calendarData) {
