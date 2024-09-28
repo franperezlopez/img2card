@@ -27,8 +27,8 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 
 # Set environment variables
-ARG API_URL
-ENV API_URL=$API_URL
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Expose the port the app runs on
 EXPOSE 3000
