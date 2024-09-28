@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Camera, Image, X, Send, Calendar, MapPin } from "lucide-react"
 
+// Add this near the top of the file
+const API_URL = process.env.API_URL || 'http://localhost:8000';
+
 interface LocationData {
   latitude: number;
   longitude: number;
@@ -101,7 +104,7 @@ export function MobilePwaPhotoApp() {
   }
 
   const handleSendPhoto = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const formData = new FormData()
       if (photo) {
@@ -111,7 +114,7 @@ export function MobilePwaPhotoApp() {
         formData.append('photo', blob, 'photo.jpg')
       }
 
-      let url = `http://localhost:8000/get_ics_card/`
+      let url = `${API_URL}/get_ics_card/`
       if (location) {
         url += `?latitude=${location.latitude}&longitude=${location.longitude}`
       }
