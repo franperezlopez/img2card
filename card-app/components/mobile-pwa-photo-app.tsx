@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "../components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card"
 import { Camera, Image, X, Send, Calendar, MapPin } from "lucide-react"
 import { useEnv } from "../env/provider"
 
