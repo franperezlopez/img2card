@@ -13,7 +13,7 @@ interface LocationData {
 
 export function MobilePwaPhotoApp() {
   const env = useEnv();
-  const apiUrl = (env as { API_URL?: string }).API_URL;
+  const apiUrl = (env as { API_URL?: string }).API_URL;  
 
   const [photo, setPhoto] = useState<string | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
@@ -114,7 +114,8 @@ export function MobilePwaPhotoApp() {
         const blob = await response.blob()
         formData.append('photo', blob, 'photo.jpg')
       }
-
+      
+      console.log(JSON.stringify(env));
       let url = `${apiUrl}/get_ics_card/`
       if (location) {
         url += `?latitude=${location.latitude}&longitude=${location.longitude}`
