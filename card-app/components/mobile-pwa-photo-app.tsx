@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Camera, Image, X, Send, Calendar, MapPin } from "lucide-react"
 
 // Add this near the top of the file
-const API_URL = process.env.API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface LocationData {
   latitude: number;
