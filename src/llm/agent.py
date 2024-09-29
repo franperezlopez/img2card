@@ -6,7 +6,7 @@ from typing import Literal, Optional, Protocol
 import randomname
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_openai import AzureChatOpenAI
 from loguru import logger
 from PIL import Image
