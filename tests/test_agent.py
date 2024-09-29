@@ -12,8 +12,8 @@ async def test_generate_vision(mocker: MockerFixture, exif_image_path: str, visi
     response.content = vision_venue_data
     mocked_client_ainvoke.return_value = response
 
-    from src.llm.agent import OpenAITool
-    tool = OpenAITool(settings)
+    from src.llm.agent import ToolFactory
+    tool = ToolFactory(settings)
     vision = await tool.generate_vision(exif_image_path)
 
     mocked_client_ainvoke.assert_called_once()

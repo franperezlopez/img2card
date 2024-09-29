@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   workflow_dispatch:
@@ -24,9 +24,32 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push Docker image
+    - name: Build and push API Docker image
       uses: docker/build-push-action@v5.1.0
       with:
         context: .
+        file: ./docker/api.Dockerfile
         push: true
-        tags: ghcr.io/${{ github.repository }}:latest
+        tags: |
+          ghcr.io/${{ github.repository }}/api:latest
+          ghcr.io/${{ github.repository }}/api:${{ github.run_number }}
+
+    - name: Build and push Bot Docker image
+      uses: docker/build-push-action@v5.1.0
+      with:
+        context: .
+        file: ./docker/bot.Dockerfile
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}/bot:latest
+          ghcr.io/${{ github.repository }}/bot:${{ github.run_number }}
+
+    - name: Build and push Card App Docker image
+      uses: docker/build-push-action@v5.1.0
+      with:
+        context: .
+        file: ./docker/app.Dockerfile
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}/app:latest
+          ghcr.io/${{ github.repository }}/app:${{ github.run_number }}

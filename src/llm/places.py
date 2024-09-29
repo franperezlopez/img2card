@@ -231,6 +231,21 @@ class PlacesTool():
 
     def __init__(self, settings: Settings):
         self.settings: Settings = settings
+    
+    def simple_search(self, query: str, latitude: float, longitude: float) -> Optional[Dict]:
+        uule = SerpapiHelper.generate_uule_v2(latitude, longitude, self.RADIUS)
+        # logger.info(f"uule: {uule}")
+        place = GeoapifyHelper.reverse_geocode(self.settings, latitude, longitude)
+        query += f", {place['city']}, {place['country']}"
+        locals = SerpapiHelper.search_by_uule(self.settings, query, uule)
+        # logger.debug(f"locals:\n{locals}")
+        if len(locals) > 0:
+            place |= locals[0]
+            # if "phone" not in place:
+            place |= SerpapiHelper.search_by_place_id(self.settings, query, place.get("place_id"))
+            logger.debug(f"place: {place}")
+            return place
+        return None
 
     def search(self, image_path: str, query: str, lat: Optional[float], lon: Optional[float]) -> Optional[Dict]:
         """

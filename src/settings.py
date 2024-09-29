@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     CONTAINER_APP_NAME: str = Field(default="debug", env="CONTAINER_APP_NAME")
 
+    API_URL: str = Field(default="http://localhost:8000", env="API_URL")
+    APP_URL: str = Field(default="http://localhost:3000", env="APP_URL")
+
     @computed_field
     @cached_property
     def LANGSMITH_TRACER(self) -> Optional[LangChainTracer]:
